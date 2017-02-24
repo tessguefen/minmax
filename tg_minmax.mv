@@ -146,11 +146,11 @@
 
 	<table border="0" cellspacing="0" cellpadding="2" width="100%">
 		<tr>
-			<td nowrap>Product Minimum</td>
+			<td nowrap>Product Minimum:</td>
 			<td width="100%"><input type="tel" name="Product_Minimum" value="{ g.Product_Minimum }" /></td>
 		</tr>
 		<tr>
-			<td nowrap>Product Maximum</td>
+			<td nowrap>Product Maximum:</td>
 			<td width="100%"><input type="tel" name="Product_Maximum" value="{ g.Product_Maximum }" /></td>
 		</tr>
 	</table>
@@ -173,12 +173,24 @@
 </MvFUNCTION>
 
 <MvFUNCTION NAME = "Module_Product_Validate" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "">
+	<MvASSIGN NAME = "g.Product_Minimum" VALUE = "{ trim( g.Product_Minimum ) }">
+	<MvASSIGN NAME = "g.Product_Maximum" VALUE = "{ trim( g.Product_Maximum ) }">
+	<MvIF EXPR = "{ NOT ISNULL g.Product_Minimum }">
+		<MvIF EXPR = "{ NOT isdigit( g.Product_Minimum ) }">
+			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Admin ].FieldError( 'TGMM', 'Product_Minimum', 'Please Enter a Whole Number.' ) }">
+		</MvIF>
+	</MvIF>
+	<MvIF EXPR = "{ NOT ISNULL g.Product_Maximum }">
+		<MvIF EXPR = "{  NOT isdigit( g.Product_Maximum ) }">
+			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Admin ].FieldError( 'TGMM', 'Product_Maximum', 'Please Enter a Whole Number.' ) }">
+		</MvIF>
+	</MvIF>
 	<MvFUNCTIONRETURN VALUE = 1>
 </MvFUNCTION>
 
 <MvCOMMENT>
 | ========================================================================================================================
-| System [system]
+| SYSTEM
 | ========================================================================================================================
 </MvCOMMENT>
 
@@ -199,7 +211,7 @@
 
 <MvCOMMENT>
 | ========================================================================================================================
-| System Extension Settings [Visual]
+| VIS_SYSTEM
 | ========================================================================================================================
 </MvCOMMENT>
 
