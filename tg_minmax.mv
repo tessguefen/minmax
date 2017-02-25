@@ -144,6 +144,12 @@
 <MvFUNCTION NAME = "Module_Product_Content" PARAMETERS = "module var, tab, load_fields, product var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
 	<MvEVAL EXPR = "{ [ g.Module_Admin ].DrawGroupTabEntry_Start( 'GT_PROD', 'TGMM' ) }">
 
+	<MvIF EXPR = "{ g.TGMM_Error NE 1 }">
+		<MvASSIGN NAME = "l.product_quantities" VALUE = "{ Load_Product_Quantites( l.product:id ) }">
+		<MvASSIGN NAME = "g.Product_Minimum" VALUE = "{ l.product_quantities:minimum }">
+		<MvASSIGN NAME = "g.Product_Maximum" VALUE = "{ l.product_quantities:maximum }">
+	</MvIF>
+
 	<table border="0" cellspacing="0" cellpadding="2" width="100%">
 		<tr>
 			<td nowrap>Product Minimum:</td>
@@ -161,6 +167,11 @@
 
 
 <MvFUNCTION NAME = "Module_Product_Update" PARAMETERS = "module var, product var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
+	<MvIF EXPR = "{ g.Product_Minimum OR g.Product_Maximum }">
+		<MvIF EXPR = "{ NOT Update_Product_Quantities( l.product:id, g.Product_Minimum, g.Product_Maximum) }">
+			<MvFUNCTIONRETURN VALUE = 0>
+		</MvIF>
+	</MvIF>
 	<MvFUNCTIONRETURN VALUE = 1 />
 </MvFUNCTION>
 
@@ -177,11 +188,13 @@
 	<MvASSIGN NAME = "g.Product_Maximum" VALUE = "{ trim( g.Product_Maximum ) }">
 	<MvIF EXPR = "{ NOT ISNULL g.Product_Minimum }">
 		<MvIF EXPR = "{ NOT isdigit( g.Product_Minimum ) }">
+			<MvASSIGN NAME = "g.TGMM_Error" VALUE = "1" />
 			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Admin ].FieldError( 'TGMM', 'Product_Minimum', 'Please Enter a Whole Number.' ) }">
 		</MvIF>
 	</MvIF>
 	<MvIF EXPR = "{ NOT ISNULL g.Product_Maximum }">
 		<MvIF EXPR = "{  NOT isdigit( g.Product_Maximum ) }">
+			<MvASSIGN NAME = "g.TGMM_Error" VALUE = "1" />
 			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Admin ].FieldError( 'TGMM', 'Product_Maximum', 'Please Enter a Whole Number.' ) }">
 		</MvIF>
 	</MvIF>
@@ -195,6 +208,18 @@
 </MvCOMMENT>
 
 <MvFUNCTION NAME = "SystemModule_Action" PARAMETERS = "module var, action" STANDARDOUTPUTLEVEL = "compresswhitespace">
+	<MvIF EXPR = "{ l.action EQ 'ADPR' }">
+		<MvDO FILE = "{ g.Module_Library_DB }" NAME = "l.success" VALUE = "{ Product_Load_Code( g.Product_Code, l.loaded_product ) }">
+		<MvASSIGN NAME = "l.pass_go" VALUE = "{ ProductCheck_ADPR( l.loaded_product:id, g.Quantity, l.error_message ) }">
+	</MvIF>
+	<MvIF EXPR = "{ l.action EQ 'QTYG' }">
+		<MvDO FILE = "{ g.Module_Library_DB }" NAME = "l.success" VALUE = "{ BasketItemList_Load_Group( g.Basket_Group, l.basketitems ) }">
+		<MvASSIGN NAME = "l.pass_go" VALUE = "{ ProductCheck_QTYG( l.basketitems[1]:product_id, g.Quantity, l.error_message ) }">
+	</MvIF>
+	<MvIF EXPR = "{ NOT ISNULL l.error_message }">
+		<MvDO FILE = "{ g.Module_Library_Utilities }" NAME = "l.success" VALUE = "{ Message_Error( l.error_message ) }">
+		<MvFUNCTIONRETURN VALUE = "-1" />
+	</MvIF>
 	<MvFUNCTIONRETURN VALUE = 1>
 </MvFUNCTION>
 
@@ -278,6 +303,12 @@
 <MvCOMMENT>
 | ========================================================================================================================
 |	Custom Functions
+|
+|	Load_Product_Quantites( product_id )
+|	Update_Product_Quantities( product_id, minimum, maximum)
+|
+|	ProductCheck( product_id, quantity, error_message )
+|	
 | ========================================================================================================================
 </MvCOMMENT>
 
@@ -307,7 +338,7 @@
 	</MvIF>
 
 	<MvASSIGN NAME = "l.return:product_id"			VALUE = "{ ProductQuantities.d.product_id }">
-	<MvASSIGN NAME = "l.return:mimumum"		VALUE = "{ ProductQuantities.d.mimumum }">
+	<MvASSIGN NAME = "l.return:minimum"		VALUE = "{ ProductQuantities.d.minimum }">
 	<MvASSIGN NAME = "l.return:maximum"		VALUE = "{ ProductQuantities.d.maximum }">
 
 	<MvCLOSEVIEW NAME = "Merchant" VIEW = "ProductQuantities">
@@ -327,7 +358,7 @@
 								maximum = ?
 							WHERE
 								product_id = ?' }"
-			 FIELDS = "l.product_id, l.mimumum, l.maximum">
+			 FIELDS = "l.product_id, l.minimum, l.maximum">
 		<MvIF EXPR = "{ g.MvQUERY_Error }">
 			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Library_Utilities ].Error( 'TGMM-MOD-2000:', g.MvQUERY_Error ) }">
 		</MvIF>
@@ -344,4 +375,78 @@
 		</MvIF>
 	</MvIF>
 	<MvFUNCTIONRETURN VALUE = 1 />
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "ProductCheck_ADPR" PARAMETERS = "product_id, quantity, error_message var" STANDARDOUTPUTLEVEL = "">
+	<MvASSIGN NAME = "l.product_setup" VALUE = "{ Load_Product_Quantites( l.product_id ) }">
+	<MvIF EXPR = "{ l.product_setup:minimum GT 0 OR l.product_setup GT 0 }">
+		<MvCOMMENT> ### Check Minimum ### </MvCOMMENT>
+
+		<MvIF EXPR = "{ l.product_setup:minimum GT 0 }">
+			<MvIF EXPR = "{ l.quantity LT l.product_setup:minimum }">
+				<MvDO FILE = "{ g.Module_Library_DB }" NAME = "l.basket_item_count" VALUE = "{ BasketItemList_Load_Basket_Product( g.basket:basket_id, l.product_id, l.product_basket_items ) }">
+				<MvIF EXPR = "{ miva_array_elements( l.product_basket_items ) GT 0 }">
+					<MvASSIGN NAME = "l.total_in_basket" VALUE = "0">
+					<MvFOREACH ITERATOR = "l.item" ARRAY = "l.product_basket_items" INDEX = "l.index">
+						<MvASSIGN NAME = "l.total_in_basket" VALUE = "{ l.total_in_basket + l.item:quantity }">
+					</MvFOREACH>
+					<MvASSIGN NAME = "l.product_quantity_result" VALUE = "{ l.total_in_basket + l.quantity }">
+					<MvIF EXPR = "{ l.product_quantity_result LT l.product_setup:minimum }">
+						<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a min. of ' $ l.product_setup:minimum $ ' for this product.' }">
+						<MvFUNCTIONRETURN VALUE = 1>
+					</MvIF>
+				<MvELSE>
+					<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a min. of ' $ l.product_setup:minimum $ ' for this product.' }">
+					<MvFUNCTIONRETURN VALUE = 1>
+				</MvIF>
+			</MvIF>
+		</MvIF>
+
+		<MvCOMMENT> ### Check Maximum ### </MvCOMMENT>
+
+		<MvIF EXPR = "{ l.product_setup:maximum GT 0 }">
+			<MvIF EXPR = "{ l.quantity GT l.product_setup:maximum }">
+				<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a max. of ' $ l.product_setup:maximum $ ' for this product.' }">
+				<MvFUNCTIONRETURN VALUE = 1>
+			<MvELSE>
+				<MvDO FILE = "{ g.Module_Library_DB }" NAME = "l.basket_item_count" VALUE = "{ BasketItemList_Load_Basket_Product( g.basket:basket_id, l.product_id, l.product_basket_items ) }">
+				<MvIF EXPR = "{ miva_array_elements( l.product_basket_items ) GT 0 }">
+					<MvASSIGN NAME = "l.total_in_basket" VALUE = "0">
+					<MvFOREACH ITERATOR = "l.item" ARRAY = "l.product_basket_items" INDEX = "l.index">
+						<MvASSIGN NAME = "l.total_in_basket" VALUE = "{ l.total_in_basket + l.item:quantity }">
+					</MvFOREACH>
+					<MvASSIGN NAME = "l.product_quantity_result" VALUE = "{ l.total_in_basket + l.quantity }">
+					<MvIF EXPR = "{ l.product_quantity_result GT l.product_setup:maximum  }">
+						<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a max. of ' $ l.product_setup:maximum $ ' for this product.' }">
+						<MvFUNCTIONRETURN VALUE = 1>
+					</MvIF>
+				</MvIF>
+			</MvIF>
+		</MvIF>
+
+	</MvIF>
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "ProductCheck_QTYG" PARAMETERS = "product_id, quantity, error_message var" STANDARDOUTPUTLEVEL = "">
+	<MvASSIGN NAME = "l.product_setup" VALUE = "{ Load_Product_Quantites( l.product_id ) }">
+	<MvIF EXPR = "{ l.product_setup:minimum GT 0 OR l.product_setup GT 0 }">
+		<MvCOMMENT> ### Check Minimum ### </MvCOMMENT>
+
+		<MvIF EXPR = "{ l.product_setup:minimum GT 0 }">
+			<MvIF EXPR = "{ l.quantity LT l.product_setup:minimum }">
+				<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a min. of ' $ l.product_setup:minimum $ ' for this product.' }">
+				<MvFUNCTIONRETURN VALUE = 1>
+			</MvIF>
+		</MvIF>
+
+		<MvCOMMENT> ### Check Maximum ### </MvCOMMENT>
+
+		<MvIF EXPR = "{ l.product_setup:maximum GT 0 }">
+			<MvIF EXPR = "{ l.quantity GT l.product_setup:maximum }">
+				<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a max. of ' $ l.product_setup:maximum $ ' for this product.' }">
+				<MvFUNCTIONRETURN VALUE = 1>
+			</MvIF>
+		</MvIF>
+
+	</MvIF>
 </MvFUNCTION>
