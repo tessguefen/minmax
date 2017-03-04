@@ -214,7 +214,7 @@
 <MvFUNCTION NAME = "SystemModule_Action" PARAMETERS = "module var, action" STANDARDOUTPUTLEVEL = "compresswhitespace">
 	<MvIF EXPR = "{ l.action EQ 'ADPR' }">
 		<MvDO FILE = "{ g.Module_Library_DB }" NAME = "l.success" VALUE = "{ Product_Load_Code( g.Product_Code, l.loaded_product ) }">
-		<MvASSIGN NAME = "l.pass_go" VALUE = "{ ProductCheck_ADPR( l.loaded_product:id, g.Quantity, l.error_message ) }">
+		<MvASSIGN NAME = "l.pass_go" VALUE = "{ ProductCheck_ADPR( l.loaded_product, g.Product_Attributes, g.Quantity, l.error_message ) }">
 	</MvIF>
 	<MvIF EXPR = "{ l.action EQ 'QTYG' }">
 		<MvDO FILE = "{ g.Module_Library_DB }" NAME = "l.success" VALUE = "{ BasketItemList_Load_Group( g.Basket_Group, l.basketitems ) }">
@@ -388,54 +388,17 @@
 	<MvFUNCTIONRETURN VALUE = 1 />
 </MvFUNCTION>
 
-<MvFUNCTION NAME = "ProductCheck_ADPR" PARAMETERS = "product_id, quantity, error_message var" STANDARDOUTPUTLEVEL = "">
-	<MvASSIGN NAME = "l.product_setup" VALUE = "{ Load_Product_Quantites( l.product_id ) }">
-	<MvIF EXPR = "{ l.product_setup:minimum GT 0 OR l.product_setup GT 0 }">
-		<MvCOMMENT> ### Check Minimum ### </MvCOMMENT>
-
-		<MvIF EXPR = "{ l.product_setup:minimum GT 0 }">
-			<MvIF EXPR = "{ l.quantity LT l.product_setup:minimum }">
-				<MvDO FILE = "{ g.Module_Library_DB }" NAME = "l.basket_item_count" VALUE = "{ BasketItemList_Load_Basket_Product( g.basket:basket_id, l.product_id, l.product_basket_items ) }">
-				<MvIF EXPR = "{ miva_array_elements( l.product_basket_items ) GT 0 }">
-					<MvASSIGN NAME = "l.total_in_basket" VALUE = "0">
-					<MvFOREACH ITERATOR = "l.item" ARRAY = "l.product_basket_items" INDEX = "l.index">
-						<MvASSIGN NAME = "l.total_in_basket" VALUE = "{ l.total_in_basket + l.item:quantity }">
-					</MvFOREACH>
-					<MvASSIGN NAME = "l.product_quantity_result" VALUE = "{ l.total_in_basket + l.quantity }">
-					<MvIF EXPR = "{ l.product_quantity_result LT l.product_setup:minimum }">
-						<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a min. of ' $ l.product_setup:minimum $ ' for this product.' }">
-						<MvFUNCTIONRETURN VALUE = 1>
-					</MvIF>
-				<MvELSE>
-					<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a min. of ' $ l.product_setup:minimum $ ' for this product.' }">
-					<MvFUNCTIONRETURN VALUE = 1>
-				</MvIF>
-			</MvIF>
-		</MvIF>
-
-		<MvCOMMENT> ### Check Maximum ### </MvCOMMENT>
-
-		<MvIF EXPR = "{ l.product_setup:maximum GT 0 }">
-			<MvIF EXPR = "{ l.quantity GT l.product_setup:maximum }">
-				<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a max. of ' $ l.product_setup:maximum $ ' for this product.' }">
-				<MvFUNCTIONRETURN VALUE = 1>
-			<MvELSE>
-				<MvDO FILE = "{ g.Module_Library_DB }" NAME = "l.basket_item_count" VALUE = "{ BasketItemList_Load_Basket_Product( g.basket:basket_id, l.product_id, l.product_basket_items ) }">
-				<MvIF EXPR = "{ miva_array_elements( l.product_basket_items ) GT 0 }">
-					<MvASSIGN NAME = "l.total_in_basket" VALUE = "0">
-					<MvFOREACH ITERATOR = "l.item" ARRAY = "l.product_basket_items" INDEX = "l.index">
-						<MvASSIGN NAME = "l.total_in_basket" VALUE = "{ l.total_in_basket + l.item:quantity }">
-					</MvFOREACH>
-					<MvASSIGN NAME = "l.product_quantity_result" VALUE = "{ l.total_in_basket + l.quantity }">
-					<MvIF EXPR = "{ l.product_quantity_result GT l.product_setup:maximum  }">
-						<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a max. of ' $ l.product_setup:maximum $ ' for this product.' }">
-						<MvFUNCTIONRETURN VALUE = 1>
-					</MvIF>
-				</MvIF>
-			</MvIF>
-		</MvIF>
-
+<MvFUNCTION NAME = "ProductCheck_ADPR" PARAMETERS = "product var, attributes, quantity, error_message var" STANDARDOUTPUTLEVEL = "">
+	<MvASSIGN NAME = "l.product_setup" VALUE = "{ Load_Product_Quantites( l.product:id ) }">
+	<MvIF EXPR = "{ NOT Product_CheckMinimum( l.product, l.attributes, l.quantity, l.product_setup) }">
+		<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a min. of ' $ l.product_setup:minimum $ ' for this product.' }">
+		<MvFUNCTIONRETURN VALUE = 0>
 	</MvIF>
+	<MvIF EXPR = "{ NOT Product_CheckMaximum( l.product, l.attributes, l.quantity, l.product_setup) }">
+		<MvASSIGN NAME = "l.error_message" VALUE = "{ 'There is a max. of ' $ l.product_setup:maximum $ ' for this product.' }">
+		<MvFUNCTIONRETURN VALUE = 0>
+	</MvIF>
+	
 </MvFUNCTION>
 
 <MvFUNCTION NAME = "ProductCheck_QTYG" PARAMETERS = "product_id, quantity, error_message var" STANDARDOUTPUTLEVEL = "">
@@ -460,4 +423,84 @@
 		</MvIF>
 
 	</MvIF>
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "Product_CheckMinimum" PARAMETERS = "product var, attributes, quantity, product_setup" STANDARDOUTPUTLEVEL = "">
+	<MvIF EXPR = "{ l.product_setup:minimum LE 0 }">
+		<MvFUNCTIONRETURN VALUE = 1>
+	</MvIF>
+
+	<MvCOMMENT> ### Grouped via Variants? ### </MvCOMMENT>
+
+	<MvASSIGN NAME = "l.attribute_count" VALUE = "{ miva_array_collapse( l.attributes ) }">
+	<MvDO FILE = "{ g.Module_Library_Utilities }" NAME = "l.success" VALUE = "{ Validate_Attributes_DetermineVariant( l.product, 0, l.attributes, l.attribute_count, l.basketoptions, l.basketoption_count, l.variant_id ) }">
+
+	<MvIF EXPR = "{ NOT Product_Quantity_Basket( l.product, l.variant_id, l.product_counts ) }">
+		<MvFUNCTIONRETURN VALUE = 0>
+	</MvIF>
+
+	<MvIF EXPR = "{ l.product_setup:minimum_variants OR 1 EQ 1}">
+		<MvASSIGN NAME = "l.product_counts:variant_total" VALUE = "{ l.product_counts:variant_total + l.quantity }">
+
+		<MvIF EXPR = "{ l.product_counts:variant_total LT l.product_setup:minimum }">
+			<MvFUNCTIONRETURN VALUE = 0>
+		</MvIF>
+	<MvELSE>
+		<MvASSIGN NAME = "l.product_counts:product_total" VALUE = "{ l.product_counts:product_total + l.quantity }">
+
+		<MvIF EXPR = "{ l.product_counts:product_total LT l.product_setup:minimum }">
+			<MvFUNCTIONRETURN VALUE = 0>
+		</MvIF>
+	</MvIF>
+
+	<MvFUNCTIONRETURN VALUE = 1>
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "Product_CheckMaximum" PARAMETERS = "product var, attributes, quantity, product_setup" STANDARDOUTPUTLEVEL = "">
+	<MvIF EXPR = "{ l.product_setup:maximum LE 0 }">
+		<MvFUNCTIONRETURN VALUE = 1>
+	</MvIF>
+
+	<MvCOMMENT> ### Grouped via Variants? ### </MvCOMMENT>
+
+	<MvASSIGN NAME = "l.attribute_count" VALUE = "{ miva_array_collapse( l.attributes ) }">
+	<MvDO FILE = "{ g.Module_Library_Utilities }" NAME = "l.success" VALUE = "{ Validate_Attributes_DetermineVariant( l.product, 0, l.attributes, l.attribute_count, l.basketoptions, l.basketoption_count, l.variant_id ) }">
+
+	<MvIF EXPR = "{ NOT Product_Quantity_Basket( l.product, l.variant_id, l.product_counts ) }">
+		<MvFUNCTIONRETURN VALUE = 0>
+	</MvIF>
+
+	<MvIF EXPR = "{ l.product_setup:maximum_variants OR 1 EQ 1}">
+		<MvASSIGN NAME = "l.product_counts:variant_total" VALUE = "{ l.product_counts:variant_total + l.quantity }">
+
+		<MvIF EXPR = "{ l.product_counts:variant_total GT l.product_setup:maximum }">
+			<MvFUNCTIONRETURN VALUE = 0>
+		</MvIF>
+	<MvELSE>
+		<MvASSIGN NAME = "l.product_counts:product_total" VALUE = "{ l.product_counts:product_total + l.quantity }">
+
+		<MvIF EXPR = "{ l.product_counts:product_total GT l.product_setup:maximum }">
+			<MvFUNCTIONRETURN VALUE = 0>
+		</MvIF>
+	</MvIF>
+
+	<MvFUNCTIONRETURN VALUE = 1>
+</MvFUNCTION>
+
+<MvFUNCTION NAME = "Product_Quantity_Basket" PARAMETERS = "product var, variant_id, product_counts var" STANDARDOUTPUTLEVEL = "">
+	<MvASSIGN NAME = "l.product_counts:variant_total" VALUE = "0">
+	<MvASSIGN NAME = "l.product_counts:product_total" VALUE = "0">
+
+	<MvDO FILE = "{ g.Module_Library_DB }" NAME = "l.basket_item_count" VALUE = "{ BasketItemList_Load_Basket_Product( g.basket:basket_id, l.product:id, l.product_basket_items ) }">
+
+	<MvIF EXPR = "{ miva_array_elements( l.product_basket_items ) GT 0 }">
+		<MvFOREACH ITERATOR = "l.item" ARRAY = "l.product_basket_items" INDEX = "l.index">
+			<MvIF EXPR = "{ l.item:variant_id EQ l.variant_id }">
+				<MvASSIGN NAME = "l.product_counts:variant_total" VALUE = "{ l.product_counts:variant_total + l.item:quantity }">
+			</MvIF>
+			<MvASSIGN NAME = "l.product_counts:product_total" VALUE = "{ l.product_counts:product_total + l.item:quantity }">
+		</MvFOREACH>
+	</MvIF>
+
+	<MvFUNCTIONRETURN VALUE = 1>
 </MvFUNCTION>
