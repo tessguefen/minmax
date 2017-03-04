@@ -151,6 +151,7 @@
 	</MvIF>
 
 	<table border="0" cellspacing="0" cellpadding="2" width="100%">
+		<input type="hidden" name="TGMM" value="1" />
 		<tr>
 			<td nowrap>Product Minimum:</td>
 			<td width="100%"><input type="tel" name="Product_Minimum" value="{ g.Product_Minimum }" /></td>
@@ -166,10 +167,11 @@
 </MvFUNCTION>
 
 
-<MvFUNCTION NAME = "Module_Product_Update" PARAMETERS = "module var, product var" STANDARDOUTPUTLEVEL = "text, html, compresswhitespace">
-	<MvIF EXPR = "{ g.Product_Minimum OR g.Product_Maximum }">
-		<MvIF EXPR = "{ NOT Update_Product_Quantities( l.product:id, g.Product_Minimum, g.Product_Maximum) }">
-			<MvFUNCTIONRETURN VALUE = 0>
+<MvFUNCTION NAME = "Module_Product_Update" PARAMETERS = "module var, product var" STANDARDOUTPUTLEVEL = "compresswhitespace">
+	<MvIF EXPR = "{ g.TGMM EQ 1 }">
+		<MvIF EXPR = "{ NOT Update_Product_Quantities( l.product:id, g.Product_Minimum, g.Product_Maximum, l.error_message ) }">
+			<MvASSIGN NAME = "g.TGMM_Error" VALUE = "1" />
+			<MvEVAL EXPR = "{ [ g.Module_Admin ].FieldError( 'TGMM', 'Product_Maximum', l.error_message ) }">
 		</MvIF>
 	</MvIF>
 	<MvFUNCTIONRETURN VALUE = 1 />
@@ -184,18 +186,20 @@
 </MvFUNCTION>
 
 <MvFUNCTION NAME = "Module_Product_Validate" PARAMETERS = "module var" STANDARDOUTPUTLEVEL = "">
-	<MvASSIGN NAME = "g.Product_Minimum" VALUE = "{ trim( g.Product_Minimum ) }">
-	<MvASSIGN NAME = "g.Product_Maximum" VALUE = "{ trim( g.Product_Maximum ) }">
-	<MvIF EXPR = "{ NOT ISNULL g.Product_Minimum }">
-		<MvIF EXPR = "{ NOT isdigit( g.Product_Minimum ) }">
-			<MvASSIGN NAME = "g.TGMM_Error" VALUE = "1" />
-			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Admin ].FieldError( 'TGMM', 'Product_Minimum', 'Please Enter a Whole Number.' ) }">
+	<MvIF EXPR = "{ g.TGMM EQ 1 }">
+		<MvASSIGN NAME = "g.Product_Minimum" VALUE = "{ trim( g.Product_Minimum ) }">
+		<MvASSIGN NAME = "g.Product_Maximum" VALUE = "{ trim( g.Product_Maximum ) }">
+		<MvIF EXPR = "{ NOT ISNULL g.Product_Minimum }">
+			<MvIF EXPR = "{ NOT isdigit( g.Product_Minimum ) }">
+				<MvASSIGN NAME = "g.TGMM_Error" VALUE = "1" />
+				<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Admin ].FieldError( 'TGMM', 'Product_Minimum', 'Please Enter a Whole Number.' ) }">
+			</MvIF>
 		</MvIF>
-	</MvIF>
-	<MvIF EXPR = "{ NOT ISNULL g.Product_Maximum }">
-		<MvIF EXPR = "{  NOT isdigit( g.Product_Maximum ) }">
-			<MvASSIGN NAME = "g.TGMM_Error" VALUE = "1" />
-			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Admin ].FieldError( 'TGMM', 'Product_Maximum', 'Please Enter a Whole Number.' ) }">
+		<MvIF EXPR = "{ NOT ISNULL g.Product_Maximum }">
+			<MvIF EXPR = "{  NOT isdigit( g.Product_Maximum ) }">
+				<MvASSIGN NAME = "g.TGMM_Error" VALUE = "1" />
+				<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Admin ].FieldError( 'TGMM', 'Product_Maximum', 'Please Enter a Whole Number.' ) }">
+			</MvIF>
 		</MvIF>
 	</MvIF>
 	<MvFUNCTIONRETURN VALUE = 1>
@@ -284,8 +288,10 @@
 	<MvASSIGN NAME = "l.fields" INDEX = "1" MEMBER = "name" VALUE = "Minimum Quantity">
 	<MvASSIGN NAME = "l.fields" INDEX = "2" MEMBER = "code" VALUE = "maximum">
 	<MvASSIGN NAME = "l.fields" INDEX = "2" MEMBER = "name" VALUE = "Maximum Quantity">
+	<MvASSIGN NAME = "l.fields" INDEX = "3" MEMBER = "code" VALUE = "multiples_of">
+	<MvASSIGN NAME = "l.fields" INDEX = "3" MEMBER = "name" VALUE = "Multiples Of">
 
-	<MvFUNCTIONRETURN VALUE = 2>
+	<MvFUNCTIONRETURN VALUE = 3>
 </MvFUNCTION>
 
 <MvFUNCTION NAME = "Module_Product_Field_Name" PARAMETERS = "module var, code" STANDARDOUTPUTLEVEL = "">
@@ -305,9 +311,9 @@
 |	Custom Functions
 |
 |	Load_Product_Quantites( product_id )
-|	Update_Product_Quantities( product_id, minimum, maximum)
+|	Update_Product_Quantities( product_id, minimum, maximum, error_message var)
 |
-|	ProductCheck( product_id, quantity, error_message )
+|	ProductCheck( product_id, quantity, error_message var )
 |	
 | ========================================================================================================================
 </MvCOMMENT>
@@ -323,8 +329,7 @@
 							FROM ' $
 								g.Store_Table_Prefix $ 'TGMM_ProductxQuantities
 							WHERE
-								product_id = ?'
-							}"
+								product_id = ?' }"
 				FIELDS	= "l.product_id">
 
 	<MvIF EXPR = "{ g.MvOPENVIEW_Error }">
@@ -337,7 +342,7 @@
 		<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Library_DB ].Error_Load_EOF( '#Error# Could Not Find Product with ID ' $ l.product_id ) }">
 	</MvIF>
 
-	<MvASSIGN NAME = "l.return:product_id"			VALUE = "{ ProductQuantities.d.product_id }">
+	<MvASSIGN NAME = "l.return:product_id"	VALUE = "{ ProductQuantities.d.product_id }">
 	<MvASSIGN NAME = "l.return:minimum"		VALUE = "{ ProductQuantities.d.minimum }">
 	<MvASSIGN NAME = "l.return:maximum"		VALUE = "{ ProductQuantities.d.maximum }">
 
@@ -345,20 +350,26 @@
 	<MvFUNCTIONRETURN VALUE = "{ l.return }" />
 </MvFUNCTION>
 
-<MvFUNCTION NAME = "Update_Product_Quantities" PARAMETERS = "product_id, minimum, maximum" STANDARDOUTPUTLEVEL = "">
-	<MvIF EXPR = "{ l.product_id LE 0 }">
-		<MvFUNCTIONRETURN />
+<MvFUNCTION NAME = "Update_Product_Quantities" PARAMETERS = "product_id, minimum, maximum, error_message var" STANDARDOUTPUTLEVEL = "">
+	<MvIF EXPR = "{ ISNULL l.product_id OR l.product_id EQ 0 }">
+		<MvFUNCTIONRETURN VALUE = "0" />
+	</MvIF>
+	<MvIF EXPR = "{ ( NOT ISNULL l.maximum ) AND ( l.maximum GT 0 ) }">
+		<MvIF EXPR = "{ l.minimum GT l.maximum }">
+			<MvASSIGN NAME = "l.error_message" VALUE = "{ 'Can you like, not? Obviously the maximum needs to be greater than the minimum!' }">
+			<MvFUNCTIONRETURN VALUE = "0" />
+		</MvIF>
 	</MvIF>
 	<MvASSIGN NAME = "l.product_check" VALUE = "{ Load_Product_Quantites( l.product_id ) }">
 	<MvIF EXPR = "{ l.product_check:product_id GT 0 }">
 		<MvQUERY NAME 	= "Merchant"
-			 QUERY 	= "{ 'UPDATE ' $ g.Store_Table_Prefix $ 'TGMM_ProductxQuantities
-							SET
-								minimum = ?,
-								maximum = ?
-							WHERE
-								product_id = ?' }"
-			 FIELDS = "l.product_id, l.minimum, l.maximum">
+				 QUERY 	= "{ 'UPDATE ' $ g.Store_Table_Prefix $ 'TGMM_ProductxQuantities 
+								SET
+									minimum = ?,
+									maximum = ?
+								WHERE
+									product_id = ?' }"
+				 FIELDS = "l.minimum, l.maximum, l.product_id">
 		<MvIF EXPR = "{ g.MvQUERY_Error }">
 			<MvFUNCTIONRETURN VALUE = "{ [ g.Module_Library_Utilities ].Error( 'TGMM-MOD-2000:', g.MvQUERY_Error ) }">
 		</MvIF>
